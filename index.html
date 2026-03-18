@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Vehicle Engine Starter</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="dashboard" class="container">
+        <!-- Phase 1: Initial Screen -->
+        <div id="phase1" class="screen active">
+            <div class="header">
+                <h1>ENGINE START</h1>
+                <p>Smart Security System</p>
+            </div>
+            <button id="startBtn" class="primary-btn">I am in, please start the engine</button>
+        </div>
+
+        <!-- Phase 2: Camera Activation & Scanning -->
+        <div id="phase2" class="screen">
+            <div class="video-container">
+                <video id="videoFeed" autoplay playsinline></video>
+                <div id="scanningOverlay" class="scanning-overlay">
+                    <div class="scanner-line"></div>
+                </div>
+            </div>
+            <p id="statusText">Scanner initializing...</p>
+            <canvas id="captureCanvas" style="display: none;"></canvas>
+        </div>
+
+        <!-- System Alerts / Status Modal -->
+        <div id="alertModal" class="modal hidden">
+            <div class="modal-content">
+                <h2 id="alertMessage"></h2>
+                <button id="closeAlertBtn" class="secondary-btn">Acknowledge</button>
+            </div>
+        </div>
+
+        <!-- Phase 4 Success Dash -->
+        <div id="successScreen" class="screen">
+            <div class="success-animation">
+                <div class="engine-ring"></div>
+                <h2>ENGINE RUNNING</h2>
+                <p id="successMessage" class="green-text">Ok, engine started.</p>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>
