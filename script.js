@@ -1,4 +1,4 @@
-const GEMINI_API_KEY = "AIzaSyAqq5bA9Pr7xM8mQU4o9cWv5cEEmDJG9-o"; // PASTE YOUR KEY HERE
+const GEMINI_API_KEY = ""; // Kept empty, handled securely by the backend now
 
 // DOM Elements
 const phase1 = document.getElementById("phase1");
@@ -12,8 +12,24 @@ const alertModal = document.getElementById("alertModal");
 const alertMessage = document.getElementById("alertMessage");
 const closeAlertBtn = document.getElementById("closeAlertBtn");
 const modalContent = document.querySelector(".modal-content");
+const scanStatusBanner = document.getElementById("scanStatusBanner");
+const peopleCountEl = document.getElementById("peopleCount");
+const helmetCountEl = document.getElementById("helmetCount");
+const systemStatusEl = document.getElementById("systemStatus");
 
 let mediaStream = null;
+let scanInterval = null;
+let validationStartTime = null;
+const VALIDATION_DURATION_MS = 2000;
+let isScanning = false;
+let lastSpokenState = "";
+
+function speakThrottled(text) {
+    if (lastSpokenState !== text) {
+        speak(text);
+        lastSpokenState = text;
+    }
+}
 
 // Speech Synthesis function
 function speak(text) {
@@ -73,14 +89,44 @@ closeAlertBtn.addEventListener("click", () => {
 // Start Process
 startBtn.addEventListener("click", async () => {
     showScreen(phase2);
-    statusText.textContent = "Scanning passengers...";
+    // Reset state
+    validationStartTime = null;
+    isScanning = true;
+    lastSpokenState = "";
+    updateBanner("Scanner initializing...", "normal");
+    peopleCountEl.textContent = "0";
+    helmetCountEl.textContent = "0";
+    systemStatusEl.textContent = "Waiting...";
+    systemStatusEl.className = "stat-value warn";
+    
     await startCamera();
 
     // Allow a few seconds for the camera to initialize and user to position
     setTimeout(() => {
-        captureAndAnalyze();
+        if (isScanning) {
+            startContinuousScanning();
+        }
     }, 3000);
 });
+
+function updateBanner(message, type) {
+    if (scanStatusBanner) {
+        scanStatusBanner.textContent = message;
+        scanStatusBanner.className = "status-banner";
+        if (type === "error") scanStatusBanner.classList.add("error");
+        if (type === "success") scanStatusBanner.classList.add("success");
+    }
+}
+
+async function startContinuousScanning() {
+    if (!isScanning) return;
+    
+    await captureAndAnalyze();
+    
+    if (isScanning) {
+        scanInterval = setTimeout(startContinuousScanning, 500); // Poll API every half second
+    }
+}
 
 async function startCamera() {
     try {
@@ -103,7 +149,7 @@ function stopCamera() {
 }
 
 async function captureAndAnalyze() {
-    statusText.textContent = "Analyzing image... Please hold still.";
+    if (!isScanning) return;
 
     // Capture from video feed
     const context = captureCanvas.getContext("2d");
@@ -121,128 +167,87 @@ async function captureAndAnalyze() {
         handleResult(result);
     } catch (error) {
         console.error("Analysis failed:", error);
-        
-        // Show exact error message to help identify if it's an API, safety, or network issue
-        statusText.textContent = `Analysis failed: ${error.message}`;
-        
-        // Fallback catch - if API refuses to answer, it might be due to not finding anything identifiable
-        if (error.message.includes("Failed to parse") || error.message.includes("Invalid response")) {
-            speak("Helmet not found or unable to analyze image. Please try again.");
-            showAlert("Analysis error: Helmet not found or image blocked.", false);
-        } else {
-            speak("System error. " + error.message);
-            showAlert("Error: " + error.message, false);
-        }
-        
-        setTimeout(() => {
-            stopCamera();
-            showScreen(phase1);
-        }, 4000);
+        updateBanner(`Analysis error: ${error.message}`, "error");
+        systemStatusEl.textContent = "Error";
+        systemStatusEl.className = "stat-value warn";
+        validationStartTime = null; // Reset validation on error
     }
 }
 
 async function analyzeWithGemini(base64Image) {
-    if (GEMINI_API_KEY === "YOUR_GEMINI_API_KEY_HERE" || !GEMINI_API_KEY) {
-        console.warn("No API key provided. Using mock response for demonstration.");
-        statusText.textContent = "Mock API (No Key) - Starting in 2s...";
-        // Simulated delay
-        await new Promise(r => setTimeout(r, 2000));
-        // Mock success case for easy demonstration if no API key is set
-        return { people_count: 2, helmet_count: 2 };
-    }
-
-    const payload = {
-        contents: [
-            {
-                parts: [
-                    {
-                        text: "Analyze this image. Count the exact number of people visible. Count the exact number of helmets being worn. Return the result strictly in JSON format: {\"people_count\": X, \"helmet_count\": Y}. If no people are detected, return 0 for both. Do not include any other text."
-                    },
-                    {
-                        inline_data: {
-                            mime_type: "image/jpeg",
-                            data: base64Image
-                        }
-                    }
-                ]
-            }
-        ],
-        generationConfig: {
-            temperature: 0.1,
-            response_mime_type: "application/json"
-        }
-    };
-
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+    const response = await fetch("http://localhost:3000/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ image: base64Image })
     });
 
     if (!response.ok) {
-        const errText = await response.text();
-        console.error("API Error Response:", errText);
-        throw new Error(`API Error ${response.status}`);
+        const errData = await response.json().catch(() => ({}));
+        console.error("API Error Response:", errData);
+        throw new Error(errData.error || `API Error ${response.status}`);
     }
 
     const data = await response.json();
-    
-    // Check for safety restrictions or empty responses
-    if (data.promptFeedback && data.promptFeedback.blockReason) {
-        throw new Error("Content blocked by safety filters.");
-    }
-    
-    if (!data.candidates || data.candidates.length === 0 || !data.candidates[0].content) {
-        throw new Error("Invalid response structure from Gemini API.");
-    }
-
-    const textResponse = data.candidates[0].content.parts[0].text;
-    
-    // Extract JSON from response (in case Gemini wraps it in markdown blocks)
-    try {
-        const jsonMatch = textResponse.match(/\{[\s\S]*?\}/);
-        if (jsonMatch) {
-            return JSON.parse(jsonMatch[0]);
-        } else {
-            return JSON.parse(textResponse);
-        }
-    } catch (e) {
-        console.error("Failed to parse JSON", e);
-        throw new Error("Invalid response format");
-    }
+    return data;
 }
 
 function handleResult(result) {
+    if (!isScanning) return;
+
     const { people_count, helmet_count } = result;
     console.log("Analysis Result:", result);
 
+    peopleCountEl.textContent = people_count;
+    helmetCountEl.textContent = helmet_count;
+
     if (people_count > 2) {
-        const msg = "It is a two-seater. Only two people can go.";
-        speak(msg);
-        showAlert(msg, false);
-        stopAndReturn();
+        validationStartTime = null;
+        updateBanner("Only two people allowed.", "error");
+        systemStatusEl.textContent = "Overcrowded";
+        systemStatusEl.className = "stat-value warn";
+        speakThrottled("It is a two-seater. Only two people can go.");
     } else if (people_count > 0 && helmet_count === 0) {
-        const msg = "Helmet not found. Please wear a helmet to start.";
-        speak(msg);
-        showAlert(msg, false);
-        stopAndReturn();
+        validationStartTime = null;
+        updateBanner("Please wear helmet", "error");
+        systemStatusEl.textContent = "Missing Helmet";
+        systemStatusEl.className = "stat-value warn";
+        speakThrottled("Please wear a helmet to start.");
     } else if (helmet_count < people_count && people_count > 0) {
-        const msg = "Sorry, please wear a helmet to start.";
-        speak(msg);
-        showAlert(msg, false);
-        stopAndReturn();
+        validationStartTime = null;
+        updateBanner("Please wear helmet", "error");
+        systemStatusEl.textContent = "Missing Helmet";
+        systemStatusEl.className = "stat-value warn";
+        speakThrottled("Please wear a helmet to start.");
     } else if (people_count === 0) {
-        const msg = "No one detected. Please try again.";
-        speak(msg);
-        showAlert(msg, false);
-        stopAndReturn();
+        validationStartTime = null;
+        updateBanner("No one detected.", "error");
+        systemStatusEl.textContent = "Empty";
+        systemStatusEl.className = "stat-value warn";
+        speakThrottled("No one detected. Please try again.");
     } else {
         // Condition 3 (Success/Ready to go): helmet_count == people_count (and people_count is 1 or 2)
-        const msg = "Ok, engine started.";
-        speak(msg);
-        // Show success screen in green
-        stopCamera();
-        showScreen(successScreen);
+        updateBanner("Yes you are wearing a helmet", "success");
+        systemStatusEl.className = "stat-value good";
+        speakThrottled("Helmet detected. Validating...");
+        
+        if (!validationStartTime) {
+            validationStartTime = Date.now();
+            systemStatusEl.textContent = `Validating... 2.0s`;
+        } else {
+            const timePassed = Date.now() - validationStartTime;
+            if (timePassed >= VALIDATION_DURATION_MS) {
+                // Success!
+                isScanning = false;
+                clearTimeout(scanInterval);
+                speak("Ok, engine started.");
+                stopCamera();
+                showScreen(successScreen);
+            } else {
+                // Still validating
+                const timeRemaining = Math.max(0, ((VALIDATION_DURATION_MS - timePassed) / 1000).toFixed(1));
+                systemStatusEl.textContent = `Validating... ${timeRemaining}s`;
+            }
+        }
     }
 }
 

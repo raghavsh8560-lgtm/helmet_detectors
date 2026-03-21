@@ -253,3 +253,105 @@ video {
     margin-top: 1rem;
     text-shadow: 0 0 10px rgba(57, 255, 20, 0.4);
 }
+
+/* Continuous Scanning UI */
+.content-split {
+    display: flex;
+    flex-direction: row;
+    gap: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+.content-split .video-container {
+    margin-bottom: 0;
+    max-width: 300px; 
+}
+
+@media (max-width: 600px) {
+    .content-split {
+        flex-direction: column;
+    }
+    .content-split .video-container {
+        margin-bottom: 1rem;
+    }
+}
+
+.stats-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--neon-cyan-dim);
+    border-radius: 10px;
+    padding: 1.5rem;
+    width: 250px;
+    text-align: left;
+}
+
+.stats-panel h3 {
+    margin-bottom: 0.5rem;
+    color: var(--neon-cyan);
+    font-family: var(--font-heading);
+    font-size: 1.2rem;
+    text-align: center;
+    border-bottom: 1px solid var(--neon-cyan-dim);
+    padding-bottom: 0.5rem;
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1.1rem;
+}
+
+.stat-label {
+    color: var(--text-main);
+}
+
+.stat-value {
+    font-family: var(--font-heading);
+    font-weight: bold;
+    color: var(--neon-cyan);
+}
+
+.stat-value.warn {
+    color: var(--neon-red);
+}
+
+.stat-value.good {
+    color: var(--neon-green);
+}
+
+.status-banner {
+    width: 100%;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border-radius: 8px;
+    font-family: var(--font-heading);
+    font-size: 1.2rem;
+    font-weight: bold;
+    text-align: center;
+    text-transform: uppercase;
+    transition: all 0.3s ease;
+    background: rgba(102, 252, 241, 0.1);
+    border: 1px solid var(--neon-cyan);
+    color: var(--neon-cyan);
+    box-shadow: 0 0 10px rgba(102, 252, 241, 0.2);
+}
+
+.status-banner.error {
+    background: rgba(255, 51, 51, 0.1);
+    border-color: var(--neon-red);
+    color: var(--neon-red);
+    box-shadow: 0 0 10px rgba(255, 51, 51, 0.2);
+}
+
+.status-banner.success {
+    background: rgba(57, 255, 20, 0.1);
+    border-color: var(--neon-green);
+    color: var(--neon-green);
+    box-shadow: 0 0 10px rgba(57, 255, 20, 0.2);
+}
