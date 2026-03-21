@@ -13,6 +13,7 @@ const alertMessage = document.getElementById("alertMessage");
 const closeAlertBtn = document.getElementById("closeAlertBtn");
 const modalContent = document.querySelector(".modal-content");
 const scanStatusBanner = document.getElementById("scanStatusBanner");
+const scanMeBtn = document.getElementById("scanMeBtn");
 const peopleCountEl = document.getElementById("peopleCount");
 const helmetCountEl = document.getElementById("helmetCount");
 const systemStatusEl = document.getElementById("systemStatus");
@@ -101,12 +102,22 @@ startBtn.addEventListener("click", async () => {
     
     await startCamera();
 
-    // Allow a few seconds for the camera to initialize and user to position
-    setTimeout(() => {
-        if (isScanning) {
-            startContinuousScanning();
-        }
-    }, 3000);
+    // Allow a few seconds for the camera to initialize
+    // The user will click "Scan Me" when ready.
+});
+
+scanMeBtn.addEventListener("click", async () => {
+    if (!isScanning) return;
+    
+    // UI feedback
+    updateBanner("Scanning...", "normal");
+    scanMeBtn.disabled = true;
+    scanMeBtn.textContent = "Scanning...";
+    
+    await captureAndAnalyze();
+    
+    scanMeBtn.disabled = false;
+    scanMeBtn.textContent = "Scan Me";
 });
 
 function updateBanner(message, type) {
@@ -119,13 +130,7 @@ function updateBanner(message, type) {
 }
 
 async function startContinuousScanning() {
-    if (!isScanning) return;
-    
-    await captureAndAnalyze();
-    
-    if (isScanning) {
-        scanInterval = setTimeout(startContinuousScanning, 5000); // Poll API every 5 seconds to prevent rate limit
-    }
+    // Deprecated function since we use simple button trigger now
 }
 
 async function startCamera() {
@@ -194,11 +199,11 @@ async function analyzeWithGemini(base64Image) {
 function handleResult(result) {
     if (!isScanning) return;
 
-    const { people_count, helmet_count } = result;
+    const { people_count, helmet_count, turban_count = 0 } = result;
     console.log("Analysis Result:", result);
 
     peopleCountEl.textContent = people_count;
-    helmetCountEl.textContent = helmet_count;
+    helmetCountEl.textContent = helmet_count + turban_count; // Combines safe headgears
 
     if (people_count > 2) {
         validationStartTime = null;
@@ -206,18 +211,18 @@ function handleResult(result) {
         systemStatusEl.textContent = "Overcrowded";
         systemStatusEl.className = "stat-value warn";
         speakThrottled("It is a two-seater. Only two people can go.");
-    } else if (people_count > 0 && helmet_count === 0) {
+    } else if (people_count > 0 && helmet_count === 0 && turban_count === 0) {
         validationStartTime = null;
-        updateBanner("Please wear helmet", "error");
+        updateBanner("Please wear helmet or turban", "error");
         systemStatusEl.textContent = "Missing Helmet";
         systemStatusEl.className = "stat-value warn";
-        speakThrottled("Please wear a helmet to start.");
-    } else if (helmet_count < people_count && people_count > 0) {
+        speakThrottled("Please wear a helmet or turban to start.");
+    } else if ((helmet_count + turban_count) < people_count && people_count > 0) {
         validationStartTime = null;
-        updateBanner("Please wear helmet", "error");
+        updateBanner("Please wear helmet or turban", "error");
         systemStatusEl.textContent = "Missing Helmet";
         systemStatusEl.className = "stat-value warn";
-        speakThrottled("Please wear a helmet to start.");
+        speakThrottled("Please wear a helmet or turban to start.");
     } else if (people_count === 0) {
         validationStartTime = null;
         updateBanner("No one detected.", "error");
@@ -225,10 +230,16 @@ function handleResult(result) {
         systemStatusEl.className = "stat-value warn";
         speakThrottled("No one detected. Please try again.");
     } else {
-        // Condition 3 (Success/Ready to go): helmet_count == people_count (and people_count is 1 or 2)
-        updateBanner("Yes you are wearing a helmet", "success");
-        systemStatusEl.className = "stat-value good";
-        speakThrottled("Helmet detected. Validating...");
+        // Condition 3 (Success/Ready to go)
+        if (turban_count > 0) {
+            updateBanner("Yes, we sincerely obey and allow you.", "success");
+            systemStatusEl.className = "stat-value good";
+            speakThrottled("Yes, we sincerely obey and allow you. Engine started.");
+        } else {
+            updateBanner("Yes you are wearing a helmet", "success");
+            systemStatusEl.className = "stat-value good";
+            speakThrottled("Helmet detected. Validating...");
+        }
         
         if (!validationStartTime) {
             validationStartTime = Date.now();

@@ -29,7 +29,7 @@ app.post('/api/analyze', async (req, res) => {
                 {
                     parts: [
                         {
-                            text: "Analyze this image. Count the exact number of people visible. Count the exact number of helmets being worn. Return the result strictly in JSON format: {\"people_count\": X, \"helmet_count\": Y}. If no people are detected, return 0 for both. Do not include any other text."
+                            text: "Analyze this image. Count the exact number of people visible. Count the exact number of helmets being worn. Count the number of turbans being worn. Return the result strictly in JSON format: {\"people_count\": X, \"helmet_count\": Y, \"turban_count\": Z}. If none are detected, return 0 for all. Do not include any other text."
                         },
                         {
                             inline_data: {
