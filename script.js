@@ -124,7 +124,7 @@ async function startContinuousScanning() {
     await captureAndAnalyze();
     
     if (isScanning) {
-        scanInterval = setTimeout(startContinuousScanning, 500); // Poll API every half second
+        scanInterval = setTimeout(startContinuousScanning, 5000); // Poll API every 5 seconds to prevent rate limit
     }
 }
 

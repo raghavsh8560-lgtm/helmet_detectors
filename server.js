@@ -55,7 +55,19 @@ app.post('/api/analyze', async (req, res) => {
         if (!response.ok) {
             const errText = await response.text();
             console.error("API Error Response:", errText);
-            return res.status(response.status).json({ error: `API Error ${response.status}: ${errText}` });
+            
+            let cleanMessage = "Unknown API error";
+            try {
+                const errJson = JSON.parse(errText);
+                if (errJson.error && errJson.error.message) {
+                    cleanMessage = errJson.error.message;
+                }
+            } catch(e) { /* ignore parse error */ }
+            
+            if (response.status === 429) {
+                return res.status(429).json({ error: "System is too busy or rate limit exceeded. Please wait a moment." });
+            }
+            return res.status(response.status).json({ error: `API Error ${response.status}: ${cleanMessage}` });
         }
 
         const data = await response.json();
