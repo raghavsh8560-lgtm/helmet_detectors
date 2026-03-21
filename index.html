@@ -18,6 +18,37 @@
             <button id="startBtn" class="primary-btn">I am in, please start the engine</button>
         </div>
 
+        <!-- Phase 1.5: Password Verification -->
+        <div id="phase-password" class="screen">
+            <div class="header">
+                <h2>SYSTEM LOCKED</h2>
+                <p>Enter Owner Password to Proceed</p>
+            </div>
+            <div class="input-container" style="text-align: center; margin-top: 30px;">
+                <input type="password" id="ownerPasswordInput" class="custom-input" placeholder="Enter Password (admin)">
+                <br><br>
+                <button id="verifyPasswordBtn" class="primary-btn">Verify Owner</button>
+            </div>
+        </div>
+
+        <!-- Phase 1.75: Aadhar Verification -->
+        <div id="phase-aadhar" class="screen">
+            <div class="header">
+                <h2>AGE VERIFICATION</h2>
+                <p>Enter 12-Digit Aadhar ID</p>
+            </div>
+            <div class="input-container" style="text-align: center; margin-top: 30px;">
+                <input type="text" id="aadharInput" class="custom-input" placeholder="e.g. 111122223333" maxlength="12">
+                <br><br>
+                <button id="verifyAadharBtn" class="primary-btn">Check Age</button>
+                <div style="margin-top: 20px; font-size: 0.9rem; color: #aaa;">
+                    <strong>Demo IDs:</strong><br>
+                    Adults (18+): 111122223333, 444455556666, 777788889999<br>
+                    Minors (&lt;18): <span style="color: #ff4444;">999900001111, 222233334444</span>
+                </div>
+            </div>
+        </div>
+
         <!-- Phase 2: Camera Activation & Scanning -->
         <div id="phase2" class="screen">
             <div id="scanStatusBanner" class="status-banner">Scanner initializing...</div>

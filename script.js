@@ -2,9 +2,15 @@ const GEMINI_API_KEY = ""; // Kept empty, handled securely by the backend now
 
 // DOM Elements
 const phase1 = document.getElementById("phase1");
+const phasePassword = document.getElementById("phase-password");
+const phaseAadhar = document.getElementById("phase-aadhar");
 const phase2 = document.getElementById("phase2");
 const successScreen = document.getElementById("successScreen");
 const startBtn = document.getElementById("startBtn");
+const ownerPasswordInput = document.getElementById("ownerPasswordInput");
+const verifyPasswordBtn = document.getElementById("verifyPasswordBtn");
+const aadharInput = document.getElementById("aadharInput");
+const verifyAadharBtn = document.getElementById("verifyAadharBtn");
 const videoFeed = document.getElementById("videoFeed");
 const captureCanvas = document.getElementById("captureCanvas");
 const statusText = document.getElementById("statusText");
@@ -24,6 +30,15 @@ let validationStartTime = null;
 const VALIDATION_DURATION_MS = 2000;
 let isScanning = false;
 let lastSpokenState = "";
+
+const OWNER_PASSWORD = "admin";
+const AADHAR_DB = {
+    "111122223333": { age: 25 },
+    "444455556666": { age: 30 },
+    "777788889999": { age: 19 },
+    "999900001111": { age: 16 }, // Minor
+    "222233334444": { age: 14 }  // Minor
+};
 
 function speakThrottled(text) {
     if (lastSpokenState !== text) {
@@ -64,6 +79,8 @@ window.speechSynthesis.onvoiceschanged = () => {
 // Switch Screens
 function showScreen(screen) {
     phase1.classList.remove("active");
+    if (phasePassword) phasePassword.classList.remove("active");
+    if (phaseAadhar) phaseAadhar.classList.remove("active");
     phase2.classList.remove("active");
     successScreen.classList.remove("active");
     screen.classList.add("active");
@@ -88,22 +105,51 @@ closeAlertBtn.addEventListener("click", () => {
 });
 
 // Start Process
-startBtn.addEventListener("click", async () => {
-    showScreen(phase2);
-    // Reset state
-    validationStartTime = null;
-    isScanning = true;
-    lastSpokenState = "";
-    updateBanner("Scanner initializing...", "normal");
-    peopleCountEl.textContent = "0";
-    helmetCountEl.textContent = "0";
-    systemStatusEl.textContent = "Waiting...";
-    systemStatusEl.className = "stat-value warn";
-    
-    await startCamera();
+startBtn.addEventListener("click", () => {
+    showScreen(phasePassword);
+    ownerPasswordInput.value = "";
+    speak("Please enter owner password.");
+});
 
-    // Allow a few seconds for the camera to initialize
-    // The user will click "Scan Me" when ready.
+// Verify Password
+verifyPasswordBtn.addEventListener("click", () => {
+    if (ownerPasswordInput.value === OWNER_PASSWORD) {
+        showScreen(phaseAadhar);
+        aadharInput.value = "";
+        speak("Password accepted. Please provide Aadhar ID to verify age.");
+    } else {
+        showAlert("Incorrect Password!", false);
+        speak("Incorrect password.");
+    }
+});
+
+// Verify Aadhar
+verifyAadharBtn.addEventListener("click", async () => {
+    const aadharId = aadharInput.value.trim();
+    if (AADHAR_DB[aadharId]) {
+        if (AADHAR_DB[aadharId].age < 18) {
+            showAlert("sorry!!! you are minor we cant let you drive", false);
+            speak("Sorry, you are a minor. We cannot let you drive.");
+            aadharInput.value = "";
+        } else {
+            showScreen(phase2);
+            // Reset state
+            validationStartTime = null;
+            isScanning = true;
+            lastSpokenState = "";
+            updateBanner("Scanner initializing...", "normal");
+            peopleCountEl.textContent = "0";
+            helmetCountEl.textContent = "0";
+            systemStatusEl.textContent = "Waiting...";
+            systemStatusEl.className = "stat-value warn";
+            
+            await startCamera();
+            speak("Age verified. Please click Scan Me when ready.");
+        }
+    } else {
+        showAlert("Invalid Aadhar ID! Please use a demo ID.", false);
+        speak("Invalid ID.");
+    }
 });
 
 scanMeBtn.addEventListener("click", async () => {
