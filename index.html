@@ -31,22 +31,45 @@
             </div>
         </div>
 
-        <!-- Phase 1.75: Aadhar Verification -->
-        <div id="phase-aadhar" class="screen">
+        <!-- Phase 1.75: License Verification -->
+        <div id="phase-license" class="screen">
             <div class="header">
-                <h2>AGE VERIFICATION</h2>
-                <p>Enter 12-Digit Aadhar ID</p>
+                <h2>DRIVER VERIFICATION</h2>
+                <p>Enter your Driving License No.</p>
             </div>
             <div class="input-container" style="text-align: center; margin-top: 30px;">
-                <input type="text" id="aadharInput" class="custom-input" placeholder="e.g. 111122223333" maxlength="12">
+                <input type="text" id="licenseInput" class="custom-input" placeholder="e.g. DL-8472" maxlength="20">
                 <br><br>
-                <button id="verifyAadharBtn" class="primary-btn">Check Age</button>
+                <button id="verifyLicenseBtn" class="primary-btn">Verify Identity</button>
                 <div style="margin-top: 20px; font-size: 0.9rem; color: #aaa;">
-                    <strong>Demo IDs:</strong><br>
-                    Adults (18+): 111122223333, 444455556666, 777788889999<br>
-                    Minors (&lt;18): <span style="color: #ff4444;">999900001111, 222233334444</span>
+                    <strong>Valid Driving Licenses:</strong><br>
+                    Girl in maroon: DL-8472<br>
+                    Boy in black: DL-5921<br>
+                    Girl in pink: DL-1034<br>
+                    <br>
+                    <strong>Licenses that will fail face match:</strong><br>
+                    DL-FAIL-1 (Try scanning your face with this!)
                 </div>
             </div>
+        </div>
+
+        <!-- Phase 1.8: Face Verification -->
+        <div id="phase-face-verify" class="screen">
+            <div class="header">
+                <h2>FACE VERIFICATION</h2>
+                <p>Please look at the camera to verify your identity</p>
+            </div>
+            <div class="video-container" style="margin-top: 20px;">
+                <video id="faceVerifyVideo" autoplay playsinline></video>
+                <div class="scanning-overlay">
+                    <div class="scanner-line"></div>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <button id="verifyFaceBtn" class="primary-btn" style="margin-bottom: 10px;">Verify My Face</button>
+                <p id="faceVerifyStatus" style="font-size: 1.1rem; color: #aaa;"></p>
+            </div>
+            <canvas id="faceCaptureCanvas" style="display: none;"></canvas>
         </div>
 
         <!-- Phase 2: Camera Activation & Scanning -->

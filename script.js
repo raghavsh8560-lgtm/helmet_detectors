@@ -3,14 +3,19 @@ const GEMINI_API_KEY = ""; // Kept empty, handled securely by the backend now
 // DOM Elements
 const phase1 = document.getElementById("phase1");
 const phasePassword = document.getElementById("phase-password");
-const phaseAadhar = document.getElementById("phase-aadhar");
+const phaseLicense = document.getElementById("phase-license");
+const phaseFaceVerify = document.getElementById("phase-face-verify");
 const phase2 = document.getElementById("phase2");
 const successScreen = document.getElementById("successScreen");
 const startBtn = document.getElementById("startBtn");
 const ownerPasswordInput = document.getElementById("ownerPasswordInput");
 const verifyPasswordBtn = document.getElementById("verifyPasswordBtn");
-const aadharInput = document.getElementById("aadharInput");
-const verifyAadharBtn = document.getElementById("verifyAadharBtn");
+const licenseInput = document.getElementById("licenseInput");
+const verifyLicenseBtn = document.getElementById("verifyLicenseBtn");
+const faceVerifyVideo = document.getElementById("faceVerifyVideo");
+const verifyFaceBtn = document.getElementById("verifyFaceBtn");
+const faceVerifyStatus = document.getElementById("faceVerifyStatus");
+const faceCaptureCanvas = document.getElementById("faceCaptureCanvas");
 const videoFeed = document.getElementById("videoFeed");
 const captureCanvas = document.getElementById("captureCanvas");
 const statusText = document.getElementById("statusText");
@@ -24,7 +29,14 @@ const peopleCountEl = document.getElementById("peopleCount");
 const helmetCountEl = document.getElementById("helmetCount");
 const systemStatusEl = document.getElementById("systemStatus");
 
+const API_BASE_URL = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:"
+    ? "http://localhost:3000" 
+    : "https://helmet-detector.onrender.com";
+
 let mediaStream = null;
+let faceMediaStream = null;
+let currentUserIdForVerification = null;
+let currentLicenseId = null;
 let scanInterval = null;
 let validationStartTime = null;
 const VALIDATION_DURATION_MS = 2000;
@@ -32,12 +44,14 @@ let isScanning = false;
 let lastSpokenState = "";
 
 const OWNER_PASSWORD = "admin";
-const AADHAR_DB = {
-    "111122223333": { age: 25 },
-    "444455556666": { age: 30 },
-    "777788889999": { age: 19 },
-    "999900001111": { age: 16 }, // Minor
-    "222233334444": { age: 14 }  // Minor
+const LICENSE_DB = {
+    // These photoId match the exact filenames in the backend /images folder (user1.jpg, user2.jpg, user3.jpg)
+    "DL-8472": { name: "User 1 (Maroon)", photoId: "user1" },
+    "DL-5921": { name: "User 2 (Black)", photoId: "user2" },
+    "DL-1034": { name: "User 3 (Pink)", photoId: "user3" },
+    
+    // Mismatched ID to trigger failure
+    "DL-FAIL-1": { name: "Dummy User", photoId: "user1" } // Expects User1's face. If anyone else scans, it will fail.
 };
 
 function speakThrottled(text) {
@@ -80,7 +94,8 @@ window.speechSynthesis.onvoiceschanged = () => {
 function showScreen(screen) {
     phase1.classList.remove("active");
     if (phasePassword) phasePassword.classList.remove("active");
-    if (phaseAadhar) phaseAadhar.classList.remove("active");
+    if (phaseLicense) phaseLicense.classList.remove("active");
+    if (phaseFaceVerify) phaseFaceVerify.classList.remove("active");
     phase2.classList.remove("active");
     successScreen.classList.remove("active");
     screen.classList.add("active");
@@ -114,26 +129,88 @@ startBtn.addEventListener("click", () => {
 // Verify Password
 verifyPasswordBtn.addEventListener("click", () => {
     if (ownerPasswordInput.value === OWNER_PASSWORD) {
-        showScreen(phaseAadhar);
-        aadharInput.value = "";
-        speak("Password accepted. Please provide Aadhar ID to verify age.");
+        showScreen(phaseLicense);
+        licenseInput.value = "";
+        speak("Password accepted. Please enter your driving license number.");
     } else {
         showAlert("Incorrect Password!", false);
         speak("Incorrect password.");
     }
 });
 
-// Verify Aadhar
-verifyAadharBtn.addEventListener("click", async () => {
-    const aadharId = aadharInput.value.trim();
-    if (AADHAR_DB[aadharId]) {
-        if (AADHAR_DB[aadharId].age < 18) {
-            showAlert("sorry!!! you are minor we cant let you drive", false);
-            speak("Sorry, you are a minor. We cannot let you drive.");
-            aadharInput.value = "";
-        } else {
+// Verify License
+verifyLicenseBtn.addEventListener("click", async () => {
+    const licenseId = licenseInput.value.trim().toUpperCase();
+    if (LICENSE_DB[licenseId]) {
+        currentUserIdForVerification = LICENSE_DB[licenseId].photoId;
+        currentLicenseId = licenseId;
+        
+        showScreen(phaseFaceVerify);
+        faceVerifyStatus.textContent = "Initializing camera...";
+        faceVerifyStatus.style.color = "#aaa";
+        
+        try {
+            faceMediaStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+            faceVerifyVideo.srcObject = faceMediaStream;
+            faceVerifyStatus.textContent = "Please look directly at the camera and click verify.";
+            speak("Please look at the camera to verify your identity.");
+        } catch (err) {
+            console.error("Camera access denied:", err);
+            faceVerifyStatus.textContent = "Error: Camera access required.";
+            speak("Camera access required.");
+            setTimeout(() => showScreen(phaseLicense), 3000);
+        }
+    } else {
+        showAlert("Invalid Driving License Number!", false);
+        speak("Invalid license number.");
+    }
+});
+
+// Verify Face via API
+verifyFaceBtn.addEventListener("click", async () => {
+    if (!faceMediaStream) return;
+    
+    verifyFaceBtn.disabled = true;
+    verifyFaceBtn.textContent = "Verifying...";
+    faceVerifyStatus.textContent = "Analyzing face... Please wait.";
+    faceVerifyStatus.style.color = "#ffaa00";
+    speak("Verifying face, please wait.");
+    
+    // Capture face
+    const context = faceCaptureCanvas.getContext("2d");
+    faceCaptureCanvas.width = faceVerifyVideo.videoWidth;
+    faceCaptureCanvas.height = faceVerifyVideo.videoHeight;
+    context.translate(faceCaptureCanvas.width, 0);
+    context.scale(-1, 1);
+    context.drawImage(faceVerifyVideo, 0, 0, faceCaptureCanvas.width, faceCaptureCanvas.height);
+    
+    const base64Image = faceCaptureCanvas.toDataURL("image/jpeg").split(",")[1];
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/verify-face`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ 
+                image: base64Image,
+                userId: currentUserIdForVerification 
+            })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `API Error ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.match === true) {
+            // STOP face camera, GO to phase 2
+            faceMediaStream.getTracks().forEach(track => track.stop());
+            faceMediaStream = null;
+            faceVerifyVideo.srcObject = null;
+            
             showScreen(phase2);
-            // Reset state
+            // Reset scan state
             validationStartTime = null;
             isScanning = true;
             lastSpokenState = "";
@@ -144,11 +221,22 @@ verifyAadharBtn.addEventListener("click", async () => {
             systemStatusEl.className = "stat-value warn";
             
             await startCamera();
-            speak("Age verified. Please click Scan Me when ready.");
+            speak("Face verified successfully! Please click Scan Me when ready.");
+        } else {
+            // MATCH FALSE!
+            faceVerifyStatus.textContent = "Sorry, face and ID did not match.";
+            faceVerifyStatus.style.color = "#ff4444";
+            speak("Sorry, face and ID did not match.");
+            verifyFaceBtn.disabled = false;
+            verifyFaceBtn.textContent = "Try Again";
         }
-    } else {
-        showAlert("Invalid Aadhar ID! Please use a demo ID.", false);
-        speak("Invalid ID.");
+    } catch (error) {
+        console.error("Face verify failed:", error);
+        faceVerifyStatus.textContent = `Error: ${error.message}`;
+        faceVerifyStatus.style.color = "#ff4444";
+        verifyFaceBtn.disabled = false;
+        verifyFaceBtn.textContent = "Try Again";
+        speak("An error occurred during verification.");
     }
 });
 
@@ -226,7 +314,7 @@ async function captureAndAnalyze() {
 }
 
 async function analyzeWithGemini(base64Image) {
-    const response = await fetch("https://helmet-detector.onrender.com/api/analyze", {
+    const response = await fetch(`${API_BASE_URL}/api/analyze`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ image: base64Image })
